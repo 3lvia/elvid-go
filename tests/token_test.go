@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"github.com/3lvia/elvid-go/elvidtoken"
 	"testing"
 )
 

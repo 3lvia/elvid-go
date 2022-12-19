@@ -1,18 +1,18 @@
 package main
 
 import (
-	"github.com/3lvia/elvid-go/elvidtoken"
+	"github.com/3lvia/elvid-go/elvidserver"
 	"net/http"
 )
 
 const jwkURL = `https://elvid.test-elvia.io/.well-known/openid-configuration/jwks`
 
 func main() {
-	if err := elvidtoken.Init(elvidtoken.WithJWKURL(jwkURL), elvidtoken.WithScope("hes-extensions.machineaccess")); err != nil {
+	if err := elvidserver.Init(elvidserver.WithJWKURL(jwkURL), elvidserver.WithScope("hes-extensions.machineaccess")); err != nil {
 		panic(err)
 	}
 
-	h := elvidtoken.Wrap(myHandlerFunc)
+	h := elvidserver.Wrap(myHandlerFunc)
 
 	go http.Handle("/", h)
 

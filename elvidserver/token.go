@@ -1,19 +1,19 @@
-// Package elvidtoken implements middleware for validating JWT tokens. The package must be initialized with a valid JWK URL
+// Package elvidserver implements middleware for validating JWT tokens. The package must be initialized with a valid JWK URL
 // (or a concrete JWK string) and a scope. All http.HandlerFuncs that the client application wants to protect with a
 // JWT token must be wrapped with the Wrap function. The wrapped function will validate the token and return an error
 // if the token is invalid or if the token does not have the required scope.
 //
 // Sample usage:
 //
-//	if err := elvidtoken.Init(elvidtoken.WithJWKURL(jwkURL), elvidtoken.WithScope("hes-extensions.machineaccess")); err != nil {
+//	if err := elvidserver.Init(elvidserver.WithJWKURL(jwkURL), elvidserver.WithScope("hes-extensions.machineaccess")); err != nil {
 //		panic(err)
 //	}
 //
-//	h := elvidtoken.Wrap(myHandlerFunc)
+//	h := elvidserver.Wrap(myHandlerFunc)
 //	if err := http.ListenAndServe(":8080", h); err != nil {
 //		panic(err)
 //	}
-package elvidtoken
+package elvidserver
 
 import (
 	"crypto/rsa"

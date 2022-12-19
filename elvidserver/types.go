@@ -1,4 +1,4 @@
-package elvidtoken
+package elvidserver
 
 import "github.com/golang-jwt/jwt/v4"
 
