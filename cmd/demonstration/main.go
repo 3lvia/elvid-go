@@ -50,6 +50,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed %v", err)
 	}
+	defer e.Shutdown()
 
 	fmt.Println(fmt.Sprintf("%s", e.OIDConfig.Issuer))
 

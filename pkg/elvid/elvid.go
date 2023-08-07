@@ -20,8 +20,9 @@ type ElvID struct {
 	jwks      *keyfunc.JWKS
 }
 
+// New creates a new instance of ElvID, used for eg checking token authenticity.
 func New(ctx context.Context, opts ...Option) (*ElvID, error) {
-	config := NewConfig(opts...)
+	config := newConfig(opts...)
 
 	client, err := tlsclient.New(config.Cert())
 	if err != nil {
@@ -51,8 +52,6 @@ func New(ctx context.Context, opts ...Option) (*ElvID, error) {
 	if err != nil {
 		return nil, errors.Join(err, errors.New("failed to create JWKS from resource at the given URL"))
 	}
-	// todo return shutdown func
-	// defer jwks.EndBackground()
 
 	return &ElvID{
 		client:    client,
@@ -61,10 +60,19 @@ func New(ctx context.Context, opts ...Option) (*ElvID, error) {
 	}, nil
 }
 
+// Shutdown cleans up background resources.
+func (elvid *ElvID) Shutdown() {
+	elvid.jwks.EndBackground()
+}
+
+// AuthorizeRequest takes an incoming request on behalf of the service and extracts the token from the "Authorization" header.
+// The token is then checked for authenticity, and then the claims of that token is verified against elvia.StandardClaims.
 func (elvid *ElvID) AuthorizeRequest(r *http.Request) error {
 	return elvid.AuthorizeRequestWithClaims(r, &StandardClaims{})
 }
 
+// AuthorizeRequestWithClaims takes an incoming request on behalf of the service and extracts the token from the "Authorization" header.
+// The token is then checked for authenticity, and then the claims of that token is verified against the passed claims' struct.
 func (elvid *ElvID) AuthorizeRequestWithClaims(r *http.Request, claims Claims) error {
 	jwtB64 := r.Header.Get("Authorization")
 	jwtB64 = strings.Replace(jwtB64, "Bearer ", "", 1)
@@ -72,10 +80,14 @@ func (elvid *ElvID) AuthorizeRequestWithClaims(r *http.Request, claims Claims) e
 	return elvid.AuthorizeWithClaims(jwtB64, claims)
 }
 
+// Authorize parses and checks the authenticity of the passed JSON Web Token (JWT).
+// The claims of that token is verified against elvia.StandardClaims.
 func (elvid *ElvID) Authorize(jwtB64 string) error {
 	return elvid.AuthorizeWithClaims(jwtB64, &StandardClaims{})
 }
 
+// AuthorizeWithClaims parses and checks the authenticity of the passed JSON Web Token (JWT).
+// The claims of that token is verified against the passed claims' struct.
 func (elvid *ElvID) AuthorizeWithClaims(jwtB64 string, claims Claims) error {
 
 	opts := []jwt.ParserOption{

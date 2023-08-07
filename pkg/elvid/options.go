@@ -13,35 +13,39 @@ type Config struct {
 }
 
 func (c *Config) Cert() string {
-	if c.cert == "" {
-		c.cert = os.Getenv("ELVID_CACERT")
-	}
 	return c.cert
 }
 
 func (c *Config) Address() string {
-	if c.address == "" {
-		c.address = os.Getenv("ELVID_BASE_URL")
-	}
 	return c.address
 }
 
 func (c *Config) Discovery() string {
-	if c.discovery == "" {
-		c.discovery = os.Getenv("ELVID_DISCOVERY")
-	}
-	if c.discovery == "" {
-		c.discovery = discoveryEndpoint
-	}
 	return c.discovery
 }
 
-func NewConfig(opts ...Option) Config {
-	var config Config
+func newConfig(opts ...Option) Config {
+	var c Config
 	for _, option := range opts {
-		option.apply(&config)
+		option.apply(&c)
 	}
-	return config
+
+	if c.cert == "" {
+		c.cert = os.Getenv("ELVID_CACERT")
+	}
+
+	if c.address == "" {
+		c.address = os.Getenv("ELVID_BASE_URL")
+	}
+
+	if c.discovery == "" {
+		c.discovery = os.Getenv("ELVID_DISCOVERY")
+
+		if c.discovery == "" {
+			c.discovery = discoveryEndpoint
+		}
+	}
+	return c
 }
 
 type Option interface {
