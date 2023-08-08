@@ -1,6 +1,10 @@
 # elvid-go
 Functionality for working with Elvid in Go.
 
+# Usage
+
+See `cmd/demonstration/main.go` for example usage.
+
 ## Generated documentation
 The source code in this repository is documented using godoc standards (https://tip.golang.org/doc/comment). The
 documentation can be generated and viewed on the local development machine as follows:

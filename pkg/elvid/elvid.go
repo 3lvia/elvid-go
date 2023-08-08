@@ -13,16 +13,16 @@ import (
 )
 
 var (
-	ErrJWKSFetchFailed = errors.New("failed to create JWKS from resource at the given URL")
-	ErrJWTParseFailed  = errors.New("failed to parse the JWT")
-	ErrInvalidToken    = errors.New("the token is invalid")
+	ErrGetJWKSFailed = errors.New("failed to create JWKS from resource at the given URL")
+	ErrInvalidJWT    = errors.New("the JWT is invalid")
+	ErrInvalidToken  = errors.New("the token is invalid")
 )
 
 // ElvID is the interface to interact with the ElvID IDP
 type ElvID struct {
 	client *http.Client
 
-	OIDConfig *OIDConfig
+	oidConfig *OidcConfig
 	jwks      *keyfunc.JWKS
 }
 
@@ -56,12 +56,12 @@ func New(ctx context.Context, opts ...Option) (*ElvID, error) {
 
 	jwks, err := keyfunc.Get(oidConfig.JsonWebKeySetUri, options)
 	if err != nil {
-		return nil, errors.Join(ErrJWKSFetchFailed, err)
+		return nil, errors.Join(ErrGetJWKSFailed, err)
 	}
 
 	return &ElvID{
 		client:    client,
-		OIDConfig: oidConfig,
+		oidConfig: oidConfig,
 		jwks:      jwks,
 	}, nil
 }
@@ -98,13 +98,13 @@ func (elvid *ElvID) AuthorizeWithClaims(jwtB64 string, claims Claims) error {
 
 	opts := []jwt.ParserOption{
 		jwt.WithLeeway(time.Minute * 5),
-		jwt.WithIssuer(elvid.OIDConfig.Issuer),
+		jwt.WithIssuer(elvid.oidConfig.Issuer),
 		jwt.WithIssuedAt(),
 	}
 
 	token, err := jwt.ParseWithClaims(jwtB64, claims, elvid.jwks.Keyfunc, opts...)
 	if err != nil {
-		return errors.Join(ErrJWTParseFailed, err)
+		return errors.Join(ErrInvalidJWT, err)
 	}
 
 	if !token.Valid {

@@ -11,44 +11,37 @@ import (
 	"golang.org/x/oauth2/clientcredentials"
 )
 
-type CustomClaims struct {
-	elvid.StandardClaims
-	Name     string   `json:"name,omitempty"`
-	Email    string   `json:"email,omitempty"`
-	AdGroups []string `json:"ad_groups,omitempty"`
-}
+const (
+	elvidBaseUrl       = "https://elvid.test-elvia.io"
+	elvidTokenEndpoint = elvidBaseUrl + "/connect/token"
 
-func (c CustomClaims) Validate() error {
-
-	if err := c.StandardClaims.Validate(); err != nil {
-		return err
-	}
-
-	// if c.ClientID != "f1d20018-9f9d-4e2d-be89-ddeb108b9aac" {
-	// 	return errors.New("clientid")
-	// }
-
-	found := false
-	for _, s := range c.Scope {
-		if s == "uges-exclusion.api.useraccess" {
-			// if s == "elsmartextensions.api" {
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		return errors.New("scope not found")
-	}
-
-	return nil
-}
+	clientId     = "client-id"
+	clientSecret = "client-secret"
+	clientScope  = "client.api"
+)
 
 func main() {
 	ctx := context.Background()
 
+	// Acquire an access token from ElvID
+	// The app must be configured with machine client access to have a client id and client secret
+	// Note: the client secret is sensitive information and should be loaded from a secrets vault
+	config := &clientcredentials.Config{
+		ClientID:     clientId,
+		ClientSecret: clientSecret,
+		TokenURL:     elvidTokenEndpoint,
+	}
+
+	token, err := config.Token(ctx)
+	if err != nil {
+		log.Fatalf("failed %v", err)
+	}
+
+	fmt.Println(fmt.Sprintf("%s", token.AccessToken))
+
+	// Create an ElvID client
 	opts := []elvid.Option{
-		elvid.WithAddress("https://elvid.test-elvia.io"),
+		elvid.WithAddress(elvidBaseUrl),
 		elvid.WithJWKS(elvid.JWKSConfig{
 			RefreshErrorHandler: func(err error) {
 				log.Printf("There was an error with the jwt.Keyfunc: %s", err.Error())
@@ -59,48 +52,66 @@ func main() {
 		}),
 	}
 
-	e, err := elvid.New(ctx, opts...)
+	elvID, err := elvid.New(ctx, opts...)
 	if err != nil {
 		log.Fatalf("failed %v", err)
 	}
-	defer e.Shutdown()
+	defer elvID.Shutdown()
 
-	fmt.Println(fmt.Sprintf("%s", e.OIDConfig.Issuer))
-
-	id := "dfa65351-b9dd-487e-b2d6-e98010ba9685"
-	sec := "Fz7bdJzabgybzyYLKyNKojAGZgwqVFku9K2ZD8nkG4MT6zhgYk1sgvq8IT6gUJo6wi7ZXy9jdHX0m5ECBSfOX77p30ptWhddiTes"
-
-	config := &clientcredentials.Config{
-		ClientID:     id,
-		ClientSecret: sec,
-		TokenURL:     e.OIDConfig.TokenEndpoint,
-	}
-
-	token, err := config.Token(ctx)
+	// Check the access token for authenticity
+	// Use the MyAppClaims struct to add your own validation rules, eg ad groups
+	claims := &MyAppClaims{}
+	err = elvID.AuthorizeWithClaims(token.AccessToken, claims)
 	if err != nil {
-		log.Fatalf("failed %v", err)
+		log.Fatalf("authorization failed %v", err)
 	}
+	log.Println("authorization succeeded")
 
-	fmt.Println(fmt.Sprintf("%s", token.AccessToken))
+	// Use the claims loaded from the token to change behaviour
+	isAdmin := hasAdGroup(claims.AdGroups, "ad-group-id")
+	log.Println("user is admin:", isAdmin)
+}
 
-	t := token.AccessToken
-	t = "eyJhbGciOiJSUzI1NiIsImtpZCI6IkQ3MjY1QkUyNUFGODcxQUVDQTI1REQ2MTY2OTY2QzE5NTVFMzQ3QTRSUzI1NiIsIng1dCI6IjF5WmI0bHI0Y2E3S0pkMWhacFpzR1ZYalI2USIsInR5cCI6ImF0K2p3dCJ9.eyJpc3MiOiJodHRwczovL2VsdmlkLnRlc3QtZWx2aWEuaW8iLCJuYmYiOjE2OTE0MDMzMTAsImlhdCI6MTY5MTQwMzMxMCwiZXhwIjoxNjkxNDA2OTEwLCJzY29wZSI6WyJvcGVuaWQiLCJwcm9maWxlIiwiZW1haWwiLCJhZF9ncm91cHMiLCJ1Z2VzLWV4Y2x1c2lvbi5hcGkudXNlcmFjY2VzcyJdLCJhbXIiOlsiZXh0ZXJuYWwiXSwiY2xpZW50X2lkIjoiZjFkMjAwMTgtOWY5ZC00ZTJkLWJlODktZGRlYjEwOGI5YWFjIiwiY2xpZW50X25hbWUiOiJlbHNtYXJ0ZXh0ZW5zaW9ucy11Z2VzLWV4Y2x1c2lvbi13ZWIgKGRldikiLCJzdWIiOiI2ZGM3MDhlYi01YWMxLTQwM2EtOGZlMi05YjVhMjBlNGUzNTgiLCJhdXRoX3RpbWUiOjE2OTA3OTAyNDIsImlkcCI6ImVsdmlhLWFkIiwiZW1haWwiOiJhbmRyZWFzLmZ1Z2xlc2FuZ0BlbHZpYS5ubyIsIm5hbWUiOiJBbmRyZWFzIEZ1Z2xlc2FuZyAoZWtzdGVybikiLCJhZF9ncm91cHMiOlsiMWM4OGE0YzMtOTEwZC00NzA5LTgxNzAtZTkxYjcwZWU2MjcxIiwiMWY2N2U3NDktZWIwNy00YTU4LWEyNGUtMjA0ZGRkNWZiNzQ2IiwiMTgyMWVlMjctYzVhMC00OTAyLTg2NDUtNWM3ZGU5MzAwODI1IiwiMzY5ODFhM2ItYjI5Zi00NDg4LWE1MGYtYjEzMjg2OWEwOGJlIiwiZWFiMzE4NDUtMjE5Yi00ZmZiLWFkMzMtY2I3ZThjZGVkY2QzIiwiMTM2YjhhMjctZTFiOS00NmUzLWFkOTItYzYwZWMzMmM1YjM5IiwiZDEyMGQ1YjItMmFkZi00N2Q5LWE4NDAtMGEwYzQ2Y2ZhNTIzIiwiZjY4MGY0MjQtNTU0Ny00OWZhLThmMDAtYzViYTc0NjRhMTgyIiwiY2RlMTI1YzEtM2NkZC00NTQyLWI3ODctYjI3MDk5ZGQ0MzQ2IiwiYmE2YThjNzEtYjczYi00M2ZlLThkZDktZWU5YWI5ZmE5NDFhIiwiZGFkZjZmNWMtMTdjNi00NDUxLWIyZWQtYjJiMTljMDY4MTgyIiwiOTEzNTVlZGMtNzQ3NC00ZmZlLWEwN2MtNDA3M2ZlMWRhMTM4IiwiOTBjYzI3NGUtMGUwOS00N2U3LTgzOTItZTkzNjA3ZmI5NTI4IiwiNWVmY2IxMDUtYTA2MS00YjJjLTljODUtZDhmM2RiODlkZmEyIiwiNDM3YTkwZGQtNzcyZS00OGZjLTg5YjktZDhkODFiOTg4MzdkIiwiZWJhOWQyMDAtM2M1Yi00NTU1LWE0ZTEtN2NhOWFkOTVkYTI4IiwiOTBhYTRjMzUtMWRkNi00M2E2LWFkYjktNTY2ZGU5YjlmMDNkIiwiYTlkMWQyNGMtOGUzMy00YjViLWJlN2EtMWYwYjIxMTQ2OGFmIiwiNWZhNzE1NWItOTI5NC00MmVjLTlkNGYtZjEwODEzMzYzYmIwIiwiMzA3ZDdjYzUtNjI4My00OWJiLWI5MGMtZDQxMzVkMGYyYjNmIiwiZWMyMTAyMWUtMGFlNy00MjRhLTk5ZmQtNTIyMzA2MWI0MmMwIiwiNzJlYTI4YzMtNTE0OS00YzE0LTlhOWUtMjVlZDdhY2JmMmEzIiwiNTk3ZTNmNzAtYzQwMC00ZmI0LWFmODgtYTk2ZDIyOGRlNTdkIiwiMjVmNGUxYTItYTUyNi00M2ZiLWJhMTEtOGI1NzBhYWY4YjE5IiwiMGIwN2YwNTAtMmRmOS00YzBlLWI5MjktNzk3N2Y0NzMwNDBhIiwiZGFiNzIxOGYtY2YyNy00NDVmLWJiYjgtMGQ0MTQ2Nzg2NzdmIiwiOTIxMzU0MzctNWU2ZS00NWY0LTlhMjctYzYxMDNlMzU2ZDUwIiwiMzRhOWUwZjAtNjdkMi00NWVkLTliNTctYzEzZTQyMzEyZmMwIiwiY2JjODNlMDUtMzE0YS00YjM4LTkwOTAtYzdkYzFlYjBhMTI2IiwiNTE2OTI3N2YtMGQ1OC00OWY4LTg0ZjktMTU0ZTcxODcyOTFkIiwiYjIxNWM5YjUtYzEzNy00OTNhLWJmNGQtYmU0ZDMyMzM5YjkyIiwiNzE4NzRiNDctYzJmZC00MWU1LTgzZWMtMWFjNmRhN2YxNGVkIiwiYmZjMTRlMDUtYTQ0OC00N2Q3LWI1YzgtMzg0ODQ2ZmE1MzZhIiwiYjkxYzlhMmItY2E1MS00NzliLWI2N2UtMDUwZTBlZWQ4ODNiIiwiODEzN2RjNjktZGNmYS00ZjYwLTllZDYtNzEzZmUxNTRjZGZhIiwiMWY0ZTM1N2MtZmI1MS00M2M5LThiMjAtNTU3Y2ZiZjhhNGY1IiwiM2I5ZWZjY2YtMWE1YS00YzIwLWJkMTItMDA5Mjk3NmJiMTE5IiwiMjc1NjNlMzItNTdhZS00ZDVmLWI0YTEtYTU5ZjlkOGU2MzQ0IiwiNGM2NjU1MzItODI2Yi00YzM4LTgxMjktYmNiZDc0NzcwMTQ1IiwiYmQ5ODdjZjEtNmZmNy00ZTQzLThhZDgtYmZkZjQzNDNhOGMyIiwiMjI0OWYzNDctZDQ1My00YWU1LWI1NjItZjhjYjllZGIzNGVlIiwiODRiY2RlZWEtZjFkNi00Y2RlLWE1M2MtNjI0MmFjNDBiNDg1IiwiNTUzZGU4M2ItMWQzOC00YjYzLWE5MmYtM2JjMmMxNGZlMjlkIiwiYWNhODNmZjktOTllNC00ODQwLWE4NTUtMDJhMTJjNzRhNDQ4IiwiNWNiYjU3Y2EtOWMyNC00YzQ4LTk0NTMtODc0YzI3ZTU5ZTE0IiwiZjNlMWJkNWItYTU4OS00NzJiLTkxYTItZDcyN2IzMDcwYzMzIiwiMjIyM2ZlNTYtMTliZi00YzBhLWFlOWMtYTA4OWNmZjJjOWFjIiwiZDAzY2M1YTQtNzkzNS00MWM3LWIyOWEtNDg1YWI0M2U0NTNkIiwiYjRjNzRlNTYtYmVjMy00Y2Q2LTg2ZWMtMTA2NjM3NDM3Y2MzIiwiYTRhODY3OGYtMmZmMy00YWMzLTgxYzgtYmNmNjE3ZDAxYjI0IiwiNmVkOGEyMjQtN2UyNy00ODczLWE0NmYtNDRiNTcwZTk0ZTI5IiwiMzhlNGUxODItNDJlNy00YmE3LWJjNjktOTY4ODMzMmQ5M2ZkIiwiMDFhZmU3NDEtYjY5Ny00MjM4LTkzNjEtYjk4MGI4N2Q1YWFkIiwiN2MxNmIyNDItOTNjOC00MDE3LTk2MzgtNmM1MjFkZThjMzkyIiwiNjBkYWNkZTgtMzFlMi00MGNmLTg5NzAtMTA0ZDQ4YzZmZmM1IiwiOGJhYmIzMTktNzBkZi00ZGE3LWFhZjEtZjg5Y2ZjNjc4MWRkIiwiZGNhZjg1ZWYtNWZjNy00ZmZmLTkwMDctNTU5YjM2NjNmOWFlIiwiMTFhNTc5ODYtY2NiMC00NTgzLTgzM2QtNmVhYTgwMTBmMjI1IiwiYWZiYjg2NzYtMWRmYi00NzI5LWEyMzMtMjcxYmQ1OWZiZWQwIiwiNTgwMDQxMjAtNzJkZS00YmM0LTgxMWEtOWU1MmVhM2IwZTgwIiwiNjg2NTVlZWUtNTg4Ni00NWQyLWIxNzItZDgwOGE3MmE4M2U3IiwiNTE2MWI4OWQtNDZkOC00YTNkLTljZjEtOWM4M2JiODA1YzdhIiwiOTIxNzk4N2QtMTY2Yy00ZWEyLWIwNzQtODg1ZGU3OGI4MDBjIiwiY2YyOTJkOGYtZDllYi00YzAyLTg3MjItNTNjNzE0NGI2MTQxIiwiYzE4NjJiZmUtYTZlNy00YWVkLTkzNDUtOGU2MTZmNjA0MGQ5IiwiM2EzM2U1NTgtODUyOS00ODA5LWFiMTAtMmMxMmYzYmFmMGYzIiwiYTFiMTZjYmYtYWZkNy00OWExLWE0MzQtNmJjZDcxZjBlZThjIiwiMTcwZTQxNTItYTNlNS00ZTYyLThjOTgtY2E0MjBlY2VmNTVlIiwiZjY3MGZhMGEtZDk2My00ZWQ1LTgzMjAtYWM5ZjVlZDliNTk0IiwiYjA4MzViNTUtODQ5Ni00MWU4LWJlMjAtMDUxZjg5OWYyNDlhIiwiZDAyYTQ0ZDMtODM4Mi00NTlhLWJlOTItNDdkOTM1YjExODc0IiwiMzNmOGVjOTUtMjljMy00NDY1LTk0ZDUtOWE2NGRmZGQ1MTc2IiwiOGQ0OGI3ZWMtYWVjOS00Y2E0LTg3YTAtYjdhYjU0YTRhZWQyIiwiYzFjYWIwMTAtZGYwYS00ZDY5LThlNjYtZDM0Yjg0MGFiODBmIiwiMmNjZmViNjktYjg5OS00M2M3LWE4N2MtZDFlNDYzNTk3ZDE0IiwiOWRkNzAzNjUtMmQxZi00M2I0LWJhY2UtMzhjMDMyNmI0MmYyIiwiMDYxYWFlNWUtMTIwNC00Y2U5LThlMDYtMjgwNDBkZTUzYzRmIiwiNzk5NDJhMTAtYTZhNS00MTY5LWI3YzMtOTAxNWY0NGNmN2FjIiwiNDMzN2Q2YTgtZDIzNS00Nzk0LTkwNjEtZmRkNTY1OWQzN2M5IiwiYzdhYjA0OGMtNmQxMC00NTA5LWFkY2EtZDdkZGE3MjdkOTM0IiwiODQxODAyNzgtYzFkYi00ZWJkLTg0MWUtY2RjYTAxMGY2OTUwIiwiNzlkYjc3ZmYtZWEyMC00NTU3LWE1N2YtNjYwMzQ4OGYzZmEwIiwiMTZhNGIyMzItMTQzOC00MTEzLTliODgtMmFkOWY2NjViYmY3IiwiZDY4OGVjMTMtYWRkNS00MTMyLThmOWItYjFmZWQwZjgwMmExIiwiOWU0MTg5MGItYTM3ZS00MzdjLWJmZTktOWQ4Mzc2NmQ4ODI0IiwiZmZkZWQ4MTktYzNlYy00ZDM0LWJkY2EtOWYzNjBlYmEyMmFiIiwiMDlhOTljYzYtMmFiYi00YTZkLTlkYTYtZDU4MGQxYzM3NmM0IiwiOTk5MWUzZTItNDY1Yy00ZmNhLWI3ZTAtZWNkNTU4M2Q4ZGY2IiwiNTg1MDM4MzEtNDIwNS00MjVmLWEzMTUtMmI0ZjgxMmNlNmI1IiwiZmZkYTc5OTUtZDA0Zi00MTI2LWEyZDEtNzgwNjU1YTE3OGQ3IiwiNjI1N2I0ZDMtNGNjZi00NjA2LTllMWMtZDJmMTZmYzhkOGY4IiwiNmMxYTgwNmQtYmQ1MS00MDFjLWIzYjMtMTQzZDg3ODE3YmEwIiwiNzgzOTkwOTItOWZlZS00MjU3LTkyZTYtOTgwYTZjM2U3N2RiIiwiYzMyYzRiZWItNWJjYS00MGE3LTgwNTItZjA1YTNjOTY5Y2EwIiwiNTZlMTBhZTAtNTI0Yi00ZjU4LTkzODUtYmVmNzkzZTY1MDI0IiwiNzdjZTM2ODQtNWZmNi00NTVhLTkwNjAtYmExNzRjYWE1MjMzIiwiNTQ5NTJhMTItNzEzMC00ODc5LTg2YjUtZTkyMGVkZTE3NTI0IiwiZDQ3YjU5ZmUtMmZmYy00NzMxLTllMTMtM2UxZDZiYjM0Y2Q0IiwiOTljMGUwN2EtNDQ0ZC00YjU1LWEyOTMtOTViZmE5ODdmMGE3IiwiOGVkMjAyZjAtMTc0Zi00ZGEzLWFhN2ItMDVjYjE3YWZjOWVmIiwiZWIxMGRkODctMzZmYS00MDVlLWFiZDUtODViZDFiMTU5OGE2IiwiZGMxOTllM2UtYjRiZi00NGM1LWEyMTktNzI3MDgzNmNkM2U0IiwiOGEyZmYxOGItMjgyMS00ZGIwLWEyMWMtMTQ3NjNlODY0MmQ3IiwiNjIyYzYzZmUtOTM5NC00YTgxLWJmNTQtMDdiY2RiMDAyYjE0IiwiNmExZWEyZTktMjQ3Ny00YzM3LWIxMDAtYWI2MDE1ODNjOWYzIiwiNWM3MDdlMzUtZmYwOC00OTc3LWI0ZTktNDM4NTE1N2I3ZDUzIiwiYjMwZDFhMWQtNTY4NC00OTM3LWEzNmMtMTU4YjhmMmMyYzQyIiwiMjE0YTIxMjMtNDBmNC00YjFhLTk4M2YtNmQxNmIyZjJjNTkzIiwiMzE1YWU3M2YtOWQyOS00NTIwLWEyMjktMmFjODI2MmFmYWMxIiwiMjUyNzY5NTMtMWUyYi00YWQ5LWI4YTYtOGI4ZTNmNGRhZDdiIiwiZjJiYTNjOGItYzgzZi00ZmQ5LWE2N2MtYmE5YmZiNDRhYTY4IiwiNjBlZGQyNjItNTViYS00ZWFmLTkyZDgtZjIzMmE1MWI5MTFmIiwiMWNhYTc4ZGUtMDUxZS00ODEzLWJkOGItZWRhYjY0ZThlNzY2IiwiZDFlNDM1MDEtMmY5NC00N2JlLTg3OTQtNmY1MDMxNzg0MWIzIiwiNmUwNTRmOGYtMDc2OC00YTU3LTkxN2EtYmRhMmQ4Mzk4MGFjIiwiZmE0Yjg4M2QtZDc5ZC00NmZjLWFlNDItYzk3MGNkM2FmN2ZmIiwiNzNmNDA0MjktM2YzZi00ZTMyLThkNTUtNzQ5Y2Q3OWY3YTQyIl0sInNpZCI6IjU5ODVBNzA3RjVEQjU5RDFBNzE3OTAwQzFCOTNCQjcwIn0.D7uNff3vYcVK2_c9NNqhWp_Nbx4RQhYxlYgo7i--huaNbuKkR-bi3x8oIwN4AIzlfNEP5H9vF5lfqPUjGP3BGPf5RsrGoqWZtZVcMIB7P3MbC4vJU_bWA7P1cCdFSB01vTfoJoy37neC8Ttw5fsW1qKg0mlzHbxdtYVz6OMz0SkWHlxt-WMoCMIFD-hciAtuWeaGSghKy1Sd3mycnvHrHUPO_ASnX5wpI45E9hH69vvIwhA0a64f3Q5yN5Fg-HMJBfLlapRLrd7OG1FI6GbqvO_sRqeJT_rzy89a1nra3yzekNppj8AGE-0ROTxqfBdr0PMSO3qf0WH8g8VlB9VhbQ"
-
-	c := &CustomClaims{}
-	err = e.AuthorizeWithClaims(t, c)
-	if err != nil {
-		log.Fatalf("failed %v", err)
-	}
-	log.Println("the token is valid")
-
-	adg := "1c88a4c3-910d-4709-8170-e91b70ee6271"
-	found := false
-	for _, v := range c.AdGroups {
-		if v == adg {
-			found = true
-			break
+func hasAdGroup(groups []string, id string) bool {
+	for _, v := range groups {
+		if v == id {
+			return true
 		}
 	}
+	return false
+}
 
-	log.Println("ad groupd found:", found)
+type MyAppClaims struct {
+	elvid.StandardClaims
+
+	// Add further claims depending on your app requirements, for example:
+	Name     string   `json:"name,omitempty"`
+	Email    string   `json:"email,omitempty"`
+	AdGroups []string `json:"ad_groups,omitempty"`
+}
+
+func (c MyAppClaims) Validate() error {
+
+	if err := c.StandardClaims.Validate(); err != nil {
+		return err
+	}
+
+	if c.ClientID != clientId {
+		return errors.New("the client id is invalid")
+	}
+
+	hasScope := func(scopes []string, requiredScope string) bool {
+		for _, s := range scopes {
+			if s == requiredScope {
+				return true
+			}
+		}
+		return false
+	}(c.Scope, clientScope)
+
+	if !hasScope {
+		return errors.New("token did not contain the required scope")
+	}
+
+	return nil
 }

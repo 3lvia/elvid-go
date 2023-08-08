@@ -12,7 +12,7 @@ var (
 	ErrFailedToReadBody = errors.New("failed to read body")
 )
 
-type OIDConfig struct {
+type OidcConfig struct {
 	Issuer                      string `json:"issuer"`
 	JsonWebKeySetUri            string `json:"jwks_uri"`
 	AuthorizationEndpoint       string `json:"authorization_endpoint"`
@@ -25,7 +25,7 @@ type OIDConfig struct {
 	DeviceAuthorizationEndpoint string `json:"device_authorization_endpoint"`
 }
 
-func fetchOIDConfig(ctx context.Context, client *http.Client, url string) (*OIDConfig, error) {
+func fetchOIDConfig(ctx context.Context, client *http.Client, url string) (*OidcConfig, error) {
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	resp, err := client.Do(req)
 	if err != nil {
@@ -33,7 +33,7 @@ func fetchOIDConfig(ctx context.Context, client *http.Client, url string) (*OIDC
 	}
 	defer resp.Body.Close()
 
-	var config OIDConfig
+	var config OidcConfig
 	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
 		return nil, errors.Join(ErrFailedToReadBody, err)
 	}

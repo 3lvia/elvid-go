@@ -6,12 +6,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-const (
-	elviaIdp string = "elvia-ad"
-)
-
 var (
-	ErrInvalidIdp = errors.New("invalid IDP")
+	ErrEmptyClientID = errors.New("the clientid is empty")
 )
 
 type Claims interface {
@@ -21,15 +17,14 @@ type Claims interface {
 
 type StandardClaims struct {
 	jwt.RegisteredClaims
-	Idp        string   `json:"idp,omitempty"`
 	Scope      []string `json:"scope,omitempty"`
 	ClientID   string   `json:"client_id,omitempty"`
 	ClientName string   `json:"client_name,omitempty"`
 }
 
 func (c StandardClaims) Validate() error {
-	if c.Idp != elviaIdp {
-		return ErrInvalidIdp
+	if c.ClientID == "" {
+		return ErrEmptyClientID
 	}
 
 	return nil

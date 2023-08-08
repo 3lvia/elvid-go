@@ -7,26 +7,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var (
-	validClaims = StandardClaims{
-		RegisteredClaims: jwt.RegisteredClaims{},
-		Idp:              elviaIdp,
-		Scope: []string{
-			"openid",
-		},
-		ClientID:   "123456",
-		ClientName: "test",
-	}
-
-	invalidClaims = StandardClaims{
-		RegisteredClaims: jwt.RegisteredClaims{},
-		Idp:              "not-valid",
-		Scope:            nil,
-		ClientID:         "",
-		ClientName:       "",
-	}
-)
-
 func TestStandardClaims_Validate(t *testing.T) {
 	tt := []struct {
 		test    string
@@ -34,14 +14,23 @@ func TestStandardClaims_Validate(t *testing.T) {
 		claims  StandardClaims
 	}{
 		{
-			test:    "invalid idp",
-			wantErr: ErrInvalidIdp,
-			claims:  invalidClaims,
+			test:    "invalid client id",
+			wantErr: ErrEmptyClientID,
+			claims: StandardClaims{
+				ClientID: "",
+			},
 		},
 		{
 			test:    "valid claims",
 			wantErr: nil,
-			claims:  validClaims,
+			claims: StandardClaims{
+				RegisteredClaims: jwt.RegisteredClaims{},
+				Scope: []string{
+					"openid",
+				},
+				ClientID:   "123456",
+				ClientName: "test",
+			},
 		},
 	}
 
