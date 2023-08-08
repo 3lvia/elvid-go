@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/3lvia/elvid-go/pkg/elvid"
 	"golang.org/x/oauth2/clientcredentials"
@@ -46,7 +47,19 @@ func (c CustomClaims) Validate() error {
 func main() {
 	ctx := context.Background()
 
-	e, err := elvid.New(ctx, elvid.WithAddress("https://elvid.test-elvia.io"))
+	opts := []elvid.Option{
+		elvid.WithAddress("https://elvid.test-elvia.io"),
+		elvid.WithJWKS(elvid.JWKSConfig{
+			RefreshErrorHandler: func(err error) {
+				log.Printf("There was an error with the jwt.Keyfunc: %s", err.Error())
+			},
+			RefreshInterval:  time.Hour,
+			RefreshRateLimit: time.Minute * 5,
+			RefreshTimeout:   time.Second * 10,
+		}),
+	}
+
+	e, err := elvid.New(ctx, opts...)
 	if err != nil {
 		log.Fatalf("failed %v", err)
 	}
