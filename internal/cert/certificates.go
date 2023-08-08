@@ -5,6 +5,10 @@ import (
 	"errors"
 )
 
+var (
+	ErrLoadingCAfromFile = errors.New("while loading CA cert from file")
+)
+
 // Pool is a storage for RootCAs, used in http requests
 type Pool struct {
 	Certs *x509.CertPool
@@ -29,7 +33,7 @@ func MakePool(certFiles ...string) (*Pool, error) {
 
 	err = pool.AppendFromFiles(certFiles)
 	if err != nil {
-		return nil, errors.Join(err, errors.New("while loading CA cert from file"))
+		return nil, errors.Join(err, ErrLoadingCAfromFile)
 	}
 
 	return pool, nil

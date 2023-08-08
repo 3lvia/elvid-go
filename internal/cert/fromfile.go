@@ -2,8 +2,13 @@ package cert
 
 import (
 	"errors"
-	"fmt"
 	"os"
+)
+
+var (
+	ErrFailedParsePEM = errors.New("failed to parse PEM")
+	ErrLoadCAFromDisk = errors.New("failed to read CA file disk")
+	ErrLoadCA         = errors.New("failed to load CA file")
 )
 
 // AppendFromFiles loads the certs from a slice of filenames to the cert pool
@@ -23,20 +28,20 @@ func (pool Pool) AppendFromFiles(certFiles []string) error {
 func (pool Pool) loadFromFile(cert string) error {
 	pem, err := os.ReadFile(cert)
 	if err != nil {
-		return errors.Join(err, errors.New(fmt.Sprintf("failed to read CA file \"%s\" from disk", cert)))
+		return errors.Join(err, ErrLoadCAFromDisk)
 	}
 
 	if err := pool.loadFromPEM(pem); err != nil {
-		return errors.Join(err, errors.New(fmt.Sprintf("failed to load CA file \"%s\"", cert)))
+		return errors.Join(err, ErrLoadCA)
 	}
 
 	return nil
 }
 
-// loadCert appends the PEM-formatted certificate to the provided pool
+// loadFromPEM appends the PEM-formatted certificate to the provided pool
 func (pool Pool) loadFromPEM(pem []byte) error {
 	if ok := pool.Certs.AppendCertsFromPEM(pem); !ok {
-		return errors.New("failed to parse PEM")
+		return ErrFailedParsePEM
 	}
 
 	return nil

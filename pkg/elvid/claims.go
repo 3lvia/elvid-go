@@ -6,6 +6,14 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+const (
+	elviaIdp string = "elvia-ad"
+)
+
+var (
+	ErrInvalidIdp = errors.New("invalid IDP")
+)
+
 type Claims interface {
 	jwt.Claims
 	Validate() error
@@ -20,8 +28,8 @@ type StandardClaims struct {
 }
 
 func (c StandardClaims) Validate() error {
-	if c.Idp != "elvia-ad" {
-		return errors.New("invalid IDP")
+	if c.Idp != elviaIdp {
+		return ErrInvalidIdp
 	}
 
 	return nil

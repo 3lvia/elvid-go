@@ -4,15 +4,20 @@ import (
 	"errors"
 )
 
+var (
+	ErrFailedParse  = errors.New("failed to parse const Comodo root certificate")
+	ErrFailedParse2 = errors.New("failed to parse const Letsencrypt root certificate")
+)
+
 // AppendCAs adds select known, trusted root certificate authorities to the pool
 // Currently adds: Comodo
 func (pool Pool) AppendCAs() error {
 	if ok := pool.Certs.AppendCertsFromPEM([]byte(comodo)); !ok {
-		return errors.New("failed to parse const Comodo root certificate")
+		return ErrFailedParse
 	}
 
 	if ok := pool.Certs.AppendCertsFromPEM([]byte(letsEncrypt)); !ok {
-		return errors.New("failed to parse const Letsencrypt root certificate")
+		return ErrFailedParse2
 	}
 
 	return nil
