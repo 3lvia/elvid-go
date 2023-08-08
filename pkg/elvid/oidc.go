@@ -7,6 +7,11 @@ import (
 	"net/http"
 )
 
+var (
+	ErrHTTPFailed       = errors.New("http request failed")
+	ErrFailedToReadBody = errors.New("failed to read body")
+)
+
 type OIDConfig struct {
 	Issuer                      string `json:"issuer"`
 	JsonWebKeySetUri            string `json:"jwks_uri"`
@@ -24,13 +29,13 @@ func fetchOIDConfig(ctx context.Context, client *http.Client, url string) (*OIDC
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(ErrHTTPFailed, err)
 	}
 	defer resp.Body.Close()
 
 	var config OIDConfig
 	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
-		return nil, errors.Join(err, errors.New("failed to read body"))
+		return nil, errors.Join(ErrFailedToReadBody, err)
 	}
 	return &config, nil
 }

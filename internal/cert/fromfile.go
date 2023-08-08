@@ -28,11 +28,11 @@ func (pool Pool) AppendFromFiles(certFiles []string) error {
 func (pool Pool) loadFromFile(cert string) error {
 	pem, err := os.ReadFile(cert)
 	if err != nil {
-		return errors.Join(err, ErrLoadCAFromDisk)
+		return errors.Join(ErrLoadCAFromDisk, err)
 	}
 
 	if err := pool.loadFromPEM(pem); err != nil {
-		return errors.Join(err, ErrLoadCA)
+		return errors.Join(ErrLoadCA, err)
 	}
 
 	return nil

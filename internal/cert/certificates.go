@@ -33,7 +33,7 @@ func MakePool(certFiles ...string) (*Pool, error) {
 
 	err = pool.AppendFromFiles(certFiles)
 	if err != nil {
-		return nil, errors.Join(err, ErrLoadingCAfromFile)
+		return nil, errors.Join(ErrLoadingCAfromFile, err)
 	}
 
 	return pool, nil

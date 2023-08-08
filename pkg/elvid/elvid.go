@@ -12,6 +12,13 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+var (
+	ErrJWKSFetchFailed = errors.New("failed to create JWKS from resource at the given URL")
+	ErrJWTParseFailed  = errors.New("failed to parse the JWT")
+	ErrInvalidToken    = errors.New("the token is invalid")
+)
+
+// ElvID is the interface to interact with the ElvID IDP
 type ElvID struct {
 	client *http.Client
 
@@ -49,7 +56,7 @@ func New(ctx context.Context, opts ...Option) (*ElvID, error) {
 
 	jwks, err := keyfunc.Get(oidConfig.JsonWebKeySetUri, options)
 	if err != nil {
-		return nil, errors.Join(err, errors.New("failed to create JWKS from resource at the given URL"))
+		return nil, errors.Join(ErrJWKSFetchFailed, err)
 	}
 
 	return &ElvID{
@@ -97,11 +104,11 @@ func (elvid *ElvID) AuthorizeWithClaims(jwtB64 string, claims Claims) error {
 
 	token, err := jwt.ParseWithClaims(jwtB64, claims, elvid.jwks.Keyfunc, opts...)
 	if err != nil {
-		return errors.Join(err, errors.New("failed to parse the JWT"))
+		return errors.Join(ErrJWTParseFailed, err)
 	}
 
 	if !token.Valid {
-		return errors.New("the token is invalid")
+		return ErrInvalidToken
 	}
 
 	return nil
