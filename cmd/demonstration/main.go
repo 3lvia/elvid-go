@@ -33,22 +33,22 @@ func main() {
 
 	token, err := config.Token(ctx)
 	if err != nil {
-		log.Fatalf("failed %v", err)
+		log.Fatalf("fetching token failed: %v", err)
 	}
 
-	fmt.Println(fmt.Sprintf("%s", token.AccessToken))
+	fmt.Println(fmt.Sprintf("access token: %s", token.AccessToken))
 
 	// Create an ElvID client
 	opts := []elvid.Option{
 		elvid.WithAddress(elvidBaseUrl),
 		elvid.WithErrorHandler(func(err error) {
-			log.Printf("There was an error with the jwt.Keyfunc: %s", err.Error())
+			log.Printf("there was an error: %s", err.Error())
 		}),
 	}
 
 	elvID, err := elvid.New(ctx, opts...)
 	if err != nil {
-		log.Fatalf("failed %v", err)
+		log.Fatalf("failed creating elvid: %v", err)
 	}
 	defer elvID.Shutdown()
 
