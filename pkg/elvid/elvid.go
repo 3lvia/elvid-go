@@ -22,7 +22,7 @@ var (
 type ElvID struct {
 	client *http.Client
 
-	oidConfig *OidcConfig
+	oidConfig *oidcConfig
 	jwks      *keyfunc.JWKS
 }
 
@@ -45,13 +45,17 @@ func New(ctx context.Context, opts ...Option) (*ElvID, error) {
 	}
 
 	options := keyfunc.Options{
-		Ctx:                 ctx,
-		Client:              client,
-		RefreshErrorHandler: config.jwksConfig.RefreshErrorHandler,
-		RefreshInterval:     config.jwksConfig.RefreshInterval,
-		RefreshRateLimit:    config.jwksConfig.RefreshRateLimit,
-		RefreshTimeout:      config.jwksConfig.RefreshTimeout,
-		RefreshUnknownKID:   true,
+		Ctx:    ctx,
+		Client: client,
+		RefreshErrorHandler: func(err error) {
+			if config.errorHandler != nil {
+				config.errorHandler(err)
+			}
+		},
+		RefreshInterval:   time.Hour * 24,
+		RefreshRateLimit:  time.Minute * 5,
+		RefreshTimeout:    time.Second * 10,
+		RefreshUnknownKID: true,
 	}
 
 	jwks, err := keyfunc.Get(oidConfig.JsonWebKeySetUri, options)
@@ -98,7 +102,6 @@ func (elvid *ElvID) AuthorizeWithClaims(jwtB64 string, claims Claims) error {
 
 	opts := []jwt.ParserOption{
 		jwt.WithLeeway(time.Minute * 5),
-		jwt.WithIssuer(elvid.oidConfig.Issuer),
 		jwt.WithIssuedAt(),
 	}
 

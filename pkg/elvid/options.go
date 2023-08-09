@@ -3,7 +3,6 @@ package elvid
 import (
 	"net/http"
 	"os"
-	"time"
 )
 
 const (
@@ -17,15 +16,10 @@ type Config struct {
 	address   string
 	discovery string
 
-	jwksConfig *JWKSConfig
+	errorHandler errorHandlerFunc
 }
 
-type JWKSConfig struct {
-	RefreshInterval     time.Duration
-	RefreshRateLimit    time.Duration
-	RefreshTimeout      time.Duration
-	RefreshErrorHandler func(err error)
-}
+type errorHandlerFunc func(err error)
 
 func newConfig(opts ...Option) Config {
 	var c Config
@@ -46,15 +40,6 @@ func newConfig(opts ...Option) Config {
 
 		if c.discovery == "" {
 			c.discovery = discoveryEndpoint
-		}
-	}
-
-	if c.jwksConfig == nil {
-		c.jwksConfig = &JWKSConfig{
-			RefreshInterval:     time.Hour,
-			RefreshRateLimit:    time.Minute * 5,
-			RefreshTimeout:      time.Second * 10,
-			RefreshErrorHandler: nil,
 		}
 	}
 
@@ -98,10 +83,10 @@ func WithDiscovery(discovery string) Option {
 	})
 }
 
-// WithJWKS lets you set timings for the background task to refresh JWKS data.
-// See https://pkg.go.dev/github.com/MicahParks/keyfunc/v2#Options
-func WithJWKS(jwks JWKSConfig) Option {
+// WithErrorHandler sets a callback function that will be called if there are
+// any errors in a background routine.
+func WithErrorHandler(fn errorHandlerFunc) Option {
 	return optionFunc(func(c *Config) {
-		c.jwksConfig = &jwks
+		c.errorHandler = fn
 	})
 }

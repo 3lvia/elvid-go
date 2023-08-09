@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/3lvia/elvid-go/pkg/elvid"
 	"golang.org/x/oauth2/clientcredentials"
@@ -42,13 +41,8 @@ func main() {
 	// Create an ElvID client
 	opts := []elvid.Option{
 		elvid.WithAddress(elvidBaseUrl),
-		elvid.WithJWKS(elvid.JWKSConfig{
-			RefreshErrorHandler: func(err error) {
-				log.Printf("There was an error with the jwt.Keyfunc: %s", err.Error())
-			},
-			RefreshInterval:  time.Hour,
-			RefreshRateLimit: time.Minute * 5,
-			RefreshTimeout:   time.Second * 10,
+		elvid.WithErrorHandler(func(err error) {
+			log.Printf("There was an error with the jwt.Keyfunc: %s", err.Error())
 		}),
 	}
 
