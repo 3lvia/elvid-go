@@ -95,7 +95,7 @@ token := "eyJh..."
 claims := &MyAppClaims{}
 err = elvID.AuthorizeWithClaims(token, claims)
 if err != nil {
-log.Fatalf("authorization failed %v", err)
+    log.Fatalf("authorization failed %v", err)
 }
 log.Println("authorization succeeded")
 
