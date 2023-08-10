@@ -52,7 +52,34 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 
 ## Extracting claims
 
-If you need to extract and validate optional claims, you can implement the `elvid.Claims` interface.
+To get the claims, use the `AuthorizeWithClaims` methods. You can use the `elvid.StandardClaims` object to get the most common, eg scopes.
+
+```go
+token := "eyJh..."
+
+claims := &elvid.StandardClaims{}
+err = elvID.AuthorizeWithClaims(token, claims)
+if err != nil {
+    log.Fatalf("authorization failed %v", err)
+}
+log.Println("authorization succeeded")
+
+// use claims.Scope to validate required app scope(s)
+hasScope := func(scopes []string, requiredScope string) bool {
+    for _, s := range scopes {
+        if s == requiredScope {
+            return true
+        }
+    }
+    return false
+}(claims.Scope, "my-app.scope")
+
+if !hasScope {
+    log.Fatal("token did not contain the required scope")
+}
+```
+
+If you need to extract and validate additional optional claims, you can implement the `elvid.Claims` interface.
 Using the `Validate() error` method, you can do validation on the claims.
 
 
@@ -72,12 +99,12 @@ func (c MyAppClaims) Validate() error {
     
     hasScope := func(scopes []string, requiredScope string) bool {
         for _, s := range scopes {
-            if s == "my-app.scope" {
+            if s == requiredScope {
                 return true
             }
         }
         return false
-    }(c.Scope, clientScope)
+    }(c.Scope, "my-app.scope")
     
     if !hasScope {
         return errors.New("token did not contain the required scope")
